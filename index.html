@@ -5,12 +5,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tipel - AI Social Network</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <style>
+    :root {
+      --bg: #000;
+      --text: #fff;
+    }
+
+    body.light {
+      --bg: #fff;
+      --text: #000;
+    }
+
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background-color: #000;
-      color: #fff;
+      background-color: var(--bg);
+      color: var(--text);
     }
 
     header {
@@ -29,7 +40,7 @@
     nav button {
       background: none;
       border: none;
-      color: #fff;
+      color: var(--text);
       margin-left: 1rem;
       font-size: 1rem;
       cursor: pointer;
@@ -44,11 +55,12 @@
       display: block;
     }
 
-    input, textarea, button {
+    input, textarea, button, select {
       padding: 0.5rem;
       margin: 0.5rem 0;
       width: 100%;
       border-radius: 5px;
+      border: 1px solid #999;
     }
 
     button {
@@ -66,23 +78,46 @@
     <nav>
       <button onclick="showTab('login')">Вхід</button>
       <button onclick="showTab('register')">Реєстрація</button>
+      <button onclick="showTab('profile')">Профіль</button>
+      <button onclick="showTab('groups')">Групи</button>
+      <button onclick="showTab('feed')">Стрічка</button>
       <button onclick="showTab('chat')">AI Чат</button>
+      <button onclick="toggleTheme()">🎨 Тема</button>
     </nav>
   </header>
 
   <main>
     <section id="login" class="tab-content active">
       <h2>Вхід</h2>
-      <input type="text" id="loginUser" placeholder="Ім'я користувача">
+      <input type="email" id="loginEmail" placeholder="Email">
       <input type="password" id="loginPass" placeholder="Пароль">
       <button onclick="login()">Увійти</button>
     </section>
 
     <section id="register" class="tab-content">
       <h2>Реєстрація</h2>
-      <input type="text" id="regUser" placeholder="Ім'я користувача">
+      <input type="email" id="regEmail" placeholder="Email">
       <input type="password" id="regPass" placeholder="Пароль">
       <button onclick="register()">Зареєструватися</button>
+    </section>
+
+    <section id="profile" class="tab-content">
+      <h2>Профіль</h2>
+      <input type="text" id="username" placeholder="Ім'я користувача">
+      <input type="file" id="avatar" accept="image/*">
+      <button onclick="saveProfile()">Зберегти профіль</button>
+    </section>
+
+    <section id="groups" class="tab-content">
+      <h2>Групи</h2>
+      <input type="text" placeholder="Назва групи">
+      <button>Створити групу</button>
+    </section>
+
+    <section id="feed" class="tab-content">
+      <h2>Стрічка</h2>
+      <textarea placeholder="Поділись новиною..."></textarea>
+      <button>Опублікувати</button>
     </section>
 
     <section id="chat" class="tab-content">
@@ -94,7 +129,7 @@
   </main>
 
   <script>
-    const users = {};
+    const supabase = supabase.createClient("https://your-project.supabase.co", "public-anon-key");
     let currentUser = null;
 
     function showTab(id) {
@@ -102,31 +137,33 @@
       document.getElementById(id).classList.add('active');
     }
 
-    function register() {
-      const user = document.getElementById('regUser').value;
-      const pass = document.getElementById('regPass').value;
-      if (!user || !pass) return alert("Заповни всі поля");
-      if (users[user]) return alert("Користувач вже існує");
-      users[user] = pass;
-      alert("Реєстрація успішна");
+    function toggleTheme() {
+      document.body.classList.toggle('light');
     }
 
-    function login() {
-      const user = document.getElementById('loginUser').value;
-      const pass = document.getElementById('loginPass').value;
-      if (users[user] === pass) {
-        currentUser = user;
-        alert("Успішний вхід як " + user);
-        showTab('chat');
-      } else {
-        alert("Неправильні дані");
+    async function register() {
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPass').value;
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) alert(error.message);
+      else alert("Успішна реєстрація!");
+    }
+
+    async function login() {
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPass').value;
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) alert("Помилка входу: " + error.message);
+      else {
+        currentUser = data.user;
+        alert("Вхід виконано");
+        showTab('profile');
       }
     }
 
     async function sendMessage() {
       const input = document.getElementById("userInput").value;
       const resDiv = document.getElementById("aiResponse");
-
       resDiv.innerHTML = "Завантаження...";
 
       try {
@@ -145,10 +182,10 @@
         });
 
         const data = await response.json();
-        const message = data.choices?.[0]?.message?.content || "Нема відповіді від AI.";
+        const message = data.choices?.[0]?.message?.content || "Немає відповіді.";
         resDiv.innerHTML = `<p>${message}</p>`;
       } catch (err) {
-        resDiv.innerHTML = "Помилка з'єднання або ключ не дійсний.";
+        resDiv.innerHTML = "Помилка AI: ключ недійсний або перевищено ліміт.";
         console.error(err);
       }
     }
